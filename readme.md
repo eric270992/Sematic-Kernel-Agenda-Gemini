@@ -154,18 +154,22 @@ Aquest fitxer conté les credencials sensibles i configuracions que no s'han de 
 ```
 
 ## Configuració i Execució
-Obtenir Credencials:
-Gemini API Key: Visita Google AI Studio per generar la teva clau API de Gemini.
-Google Calendar API Credentials:
-Vés a la Google Cloud Console.
-Crea un nou projecte si no en tens un.
-Habilita l'API de Google Calendar.
-Vés a "Credencials" i crea unes noves credencials de "ID de cliente de OAuth". Selecciona "Aplicación de escritorio".
-Descarrega el JSON amb el teu client_id i client_secret.
-Actualitzar configs.json: Copia les teves credencials al fitxer configs.json segons l'estructura proporcionada.
-Instal·lar Paquets NuGet: Assegura't que els paquets Microsoft.SemanticKernel i Microsoft.SemanticKernel.Connectors.Google (i altres si n'hi ha) estan actualitzats a les darreres versions pre-release per garantir la compatibilitat de les API (dotnet add package <PackageName> --prerelease).
-Compilar i Executar:
-Obre el projecte a Visual Studio.
-Neteja i Recompila la solució (Build > Clean Solution, Build > Rebuild Solution).
-Executa el projecte.
-Autenticació de Google Calendar (Primera vegada): La primera vegada que s'executi, s'obrirà una finestra del navegador per autoritzar l'aplicació amb el teu compte de Google. Has d'acceptar els permisos perquè l'aplicació pugui veure i gestionar els teus esdeveniments de calendari.
+
+### Obtenir Credencials
+- **Gemini API Key**: Visita **Google AI Studio** per generar la teva clau API de Gemini.  
+- **Google Calendar API Credentials**:  
+  1. Vés a la **Google Cloud Console**.  
+  2. Crea un nou projecte si no en tens un.  
+  3. Habilita l'API de **Google Calendar**.  
+  4. Vés a **Credencials** i crea unes noves credencials de **ID de cliente de OAuth**.  
+     - Selecciona *Aplicación de escritorio*.  
+  5. Descarrega el **JSON** amb el teu `client_id` i `client_secret`.
+
+### Actualitzar `configs.json`
+- Copia les teves credencials al fitxer `configs.json` segons l'estructura proporcionada.
+
+### Instal·lar Paquets NuGet
+- Assegura't que els paquets següents estan actualitzats a les darreres versions **pre-release** per garantir la compatibilitat de les API:  
+  ```bash
+  dotnet add package Microsoft.SemanticKernel --prerelease
+  dotnet add package Microsoft.SemanticKernel.Connectors.Google --prerelease
