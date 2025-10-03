@@ -29,18 +29,54 @@ L'arquitectura del projecte es basa en la modularitat i l'ús de la Injecció de
 
 ---
 
-## 3. `CalendarPlugin` vs. `Calendari`: Separació de Responsabilitats
+## 3. `CalendarPlugin` vs. `Calendari`: La Separació de Responsabilitats
 
-Aquesta és una de les parts més importants de l'arquitectura del projecte i demostra una bona pràctica de disseny:
+Una de les pedres angulars d'aquest projecte és la clara separació de responsabilitats entre les classes `Calendari.cs` i `CalendarPlugin.cs`. Aquesta distinció és fonamental per a la modularitat, testabilitat i manteniment del codi, i és clau per entendre com Semantic Kernel integra les "eines" amb els models de llenguatge.
 
-*   **`CALENDAR/Calendari.cs`**:
-    *   **Què fa:** És la capa de servei **purament tècnica** que sap com parlar amb l'API de Google Calendar. Conté mètodes com `ObtenirUltimsEvents()`, `CheckAvailability(startTime, endTime)` i `CreateEvent(summary, startTime, endTime)`.
-    *   **Per què és important:** Manté la lògica d'autenticació (OAuth2), les crides HTTP i el tractament dels objectes de Google API (com `Event` i `EventDateTime`) centralitzada i aïllada. És agnòstic a Semantic Kernel o a qualsevol LLM. Si algun dia volguéssim utilitzar una altra tecnologia de calendari, només hauríiem de modificar (o substituir) aquesta classe.
+### L'Analogia del Restaurant 🍽️
 
-*   **`Plugins/CalendarPlugin.cs`**:
-    *   **Què fa:** Actua com l'**interfície del calendari per a Semantic Kernel**. Conté mètodes públics marcats amb `[KernelFunction]` i `[Description]`, com `CreateCalendarEvent` i `GetUpcomingEvents`. Aquests mètodes són els que el LLM pot "veure" i "invocar".
-    *   **Com interactua amb `Calendari`:** `CalendarPlugin` té una dependència de `Calendari` (s'injecta al constructor). Així, quan el LLM decideix cridar, per exemple, `CreateCalendarEvent`, el `CalendarPlugin` pren els paràmetres que el LLM li ha passat, els valida si cal, i després crida el mètode corresponent de la classe `Calendari` per realitzar l'operació real.
-    *   **Per què és important:** Aquesta separació permet que la lògica de `Calendari` sigui reutilitzable i no estigui acoblada a Semantic Kernel. El `CalendarPlugin` actua com un adaptador, presentant les funcionalitats del calendari en un format que Semantic Kernel i el LLM poden entendre i utilitzar per a la "Function Calling".
+Per entendre-ho millor, imaginem un restaurant:
+
+*   **El Director d'Orquestra (Kernel de Semantic Kernel):** És qui coordina tot i parla amb els cambrers i els cuiners.
+*   **El Cambrer Intel·ligent (Google Gemini, a través del Kernel):** És el qui interactua amb el client (l'usuari), entén la seva comanda en llenguatge natural i decideix quins plats oferir o quines recomanacions fer.
+*   **El Menú del Restaurant (`Plugins/CalendarPlugin.cs`):** Aquesta és la interfície que el cambrer (Gemini) utilitza per saber quins "plats" (funcions) es poden oferir als clients (usuaris). Descriu els plats de manera que el cambrer i el client els puguin entendre, amb un nom clar i una descripció (`[KernelFunction]` i `[Description]`).
+*   **La Cuina amb les Receptes (`CALENDAR/Calendari.cs`):** Aquesta és la implementació tècnica i detallada de com es preparen els plats. Conté les "receptes" (mètodes) exactes per fer cada cosa (parlar amb l'API de Google, gestionar l'autenticació, etc.). El cambrer i el client no veuen la cuina ni les receptes.
+
+### Funcions i Responsabilitats Específiques:
+
+#### 3.1. `CALENDAR/Calendari.cs` (La Cuina / L'Expert Tècnic)
+
+*   **Responsabilitat Principal:** La seva única responsabilitat és saber *com* interactuar amb l'API de Google Calendar a un nivell baix.
+*   **Què fa:**
+    *   Gestiona l'**autenticació OAuth2** amb Google.
+    *   Construeix les **peticions HTTP** a l'API de Google Calendar.
+    *   Maneja les respostes tècniques de l'API i els objectes específics de Google (com `Event`, `EventDateTime`).
+    *   Implementa les operacions de calendari pures: `ObtenirUltimsEvents()`, `CheckAvailability(startTime, endTime)`, `CreateEvent(summary, startTime, endTime)`, `ObtenirEventsEntreDates(startDate, endDate)`.
+*   **Per què és important:** És la capa de servei **purament tècnica**. És agnòstica a la IA o a Semantic Kernel. Si Google canvia la seva API de Calendar, només hauríies de modificar aquesta classe. Permet la reutilització de la lògica de calendari en altres parts de l'aplicació que no necessiten IA.
+
+#### 3.2. `Plugins/CalendarPlugin.cs` (El Menú del Restaurant / L'Adaptador per a l'IA)
+
+*   **Responsabilitat Principal:** Actuar com la interfície que **presenta** les funcionalitats del calendari a Semantic Kernel (i per extensió, a Google Gemini) de manera que l'IA les pugui entendre i invocar.
+*   **Què fa:**
+    *   Conté mètodes públics marcats amb `[KernelFunction]` i `[Description]`, com `CreateCalendarEvent` i `GetEventsBetweenDates`. Aquests atributs són el que el Kernel utilitza per construir el "catàleg d'eines" per a Gemini.
+    *   **Tradueix i valida els paràmetres:** Rep els arguments que el LLM li passa (que són cadenes de text interpretades per l'IA) i els converteix als tipus de dades (`DateTimeOffset`, etc.) que `Calendari.cs` espera.
+    *   **Delega la tasca:** Un cop els paràmetres estan preparats, **crida els mètodes corresponents de la instància de `Calendari`** que se li ha injectat al constructor.
+*   **Per què és important:** Aquesta classe és l'adaptador. El model Gemini (el cambrer) només "veu" el menú (`CalendarPlugin`) i les seves descripcions. No sap ni li importa com la cuina (`Calendari`) prepara els plats. Si el LLM necessita una funció, la demana al `CalendarPlugin`, i aquest últim s'encarrega d'orquestrar l'execució amb la lògica tècnica de `Calendari`.
+
+### Flux d'Execució amb la Separació:
+
+1.  **Usuari:** "Genera una cita per demà a les 10:00 per anar al dentista."
+2.  **`GeminiChatService`:** Envia la petició i el "catàleg d'eines" del `CalendarPlugin` al model Gemini.
+3.  **Gemini (LLM):** Analitza la petició i el "menú" del `CalendarPlugin`. Decideix que la funció `CreateCalendarEvent` és l'adequada i extreu els paràmetres (`summary="anar al dentista"`, `dateString="[data de demà]"`, `timeString="10:00"`).
+4.  **Semantic Kernel:** Intercepta la intenció de Gemini de cridar la funció i **invoca el mètode C# `CalendarPlugin.CreateCalendarEvent()`**.
+5.  **`CalendarPlugin.CreateCalendarEvent()`:**
+    *   Rep els arguments de Gemini.
+    *   Converteix `dateString` i `timeString` a `DateTimeOffset`.
+    *   **Crida a `_calendari.CheckAvailability()` i `_calendari.CreateEvent()`** per realitzar les operacions reals amb Google Calendar.
+6.  **`Calendari.CheckAvailability()` / `Calendari.CreateEvent()`:** Executa les operacions directes amb l'API de Google Calendar.
+7.  **Resultat:** L'operació de `Calendari` retorna el seu resultat a `CalendarPlugin`, que al seu torn el retorna a Semantic Kernel. Semantic Kernel llavors presenta aquest resultat a Gemini per generar la resposta final per a l'usuari.
+
+Aquesta arquitectura garanteix una aplicació clara, mantenible, extensible i que aprofita al màxim les capacitats del "Function Calling" de Semantic Kernel.
 
 ---
 

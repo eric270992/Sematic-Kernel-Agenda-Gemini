@@ -4,6 +4,7 @@ using SemanticKernel_Agenda.CALENDAR; // Assegura't que el namespace és correct
 using System;
 using System.ComponentModel;
 using System.Globalization;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace SemanticKernel_Agenda.PLUGINS
@@ -82,5 +83,53 @@ namespace SemanticKernel_Agenda.PLUGINS
                 return $"Conflicte d'horari: Ja hi ha un esdeveniment per al {startTime.ToString("g")}. No s'ha pogut crear l'esdeveniment '{summary}'.";
             }
         }
+
+        /// <summary>
+        /// Obté i mostra esdeveniments del calendari entre dues dates especificades.
+        /// </summary>
+        /// <param name="startDateString">La data d'inici en format 'YYYY-MM-DD'.</param>
+        /// <param name="endDateString">La data de fi en format 'YYYY-MM-DD'.</param>
+        /// <returns>Una cadena amb la llista dels esdeveniments trobats, o un missatge si no n'hi ha.</returns>
+        [KernelFunction, Description("Obté esdeveniments del calendari entre dues dates (YYYY-MM-DD).")]
+        public async Task<string> ObtenirEventsEntreDates(
+            [Description("La data d'inici de la cerca en format 'YYYY-MM-DD'.")] string startDateString,
+            [Description("La data de fi de la cerca en format 'YYYY-MM-DD'.")] string endDateString)
+        {
+            Console.WriteLine($"Crida a la funció: GetEventsBetweenDates amb Data Inici: '{startDateString}', Data Fi: '{endDateString}'");
+
+            if (!DateTime.TryParseExact(startDateString, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime startDate) ||
+                !DateTime.TryParseExact(endDateString, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime endDate))
+            {
+                return "Error: Format de data invàlid. Utilitza YYYY-MM-DD.";
+            }
+
+            // Per assegurar que la endDate inclou tot el dia, l'avancem un dia menys 1 mil·lisegon o similar
+            // Si no, endDate a les 00:00:00 no inclouria cap esdeveniment d'aquell dia.
+            // O, més simple, fem la crida a GetEventsBetweenDates amb la data final + 1 dia i luego filtrem.
+            // L'API de Google Calendar ja interpreta TimeMax com a exclusiu si és una data sense hora específica.
+            // Així que si volem incloure tot el dia, hauria de ser l'endemà a les 00:00.
+            DateTimeOffset startDateTimeOffset = new DateTimeOffset(startDate, DateTimeOffset.Now.Offset);
+            DateTimeOffset endDateTimeOffset = new DateTimeOffset(endDate.AddDays(1), DateTimeOffset.Now.Offset); // Incloure fins al final del dia.
+
+            var events = await _calendari.ObtenirEventsEntreDates(startDateTimeOffset, endDateTimeOffset);
+
+            if (events.Count == 0)
+            {
+                return $"No s'han trobat esdeveniments entre el {startDateString} i el {endDateString}.";
+            }
+            else
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine($"Esdeveniments entre el {startDateString} i el {endDateString}:");
+                foreach (var eventItem in events)
+                {
+                    string when = eventItem.Start.DateTime.HasValue ? eventItem.Start.DateTime.Value.ToString("g") : eventItem.Start.Date;
+                    sb.AppendLine($"- {eventItem.Summary} ({when})");
+                }
+                return sb.ToString();
+            }
+        }
+
+        // ... (resta del codi existent) ...
     }
 }

@@ -4,8 +4,11 @@ using Google.Apis.Calendar.v3.Data; // Necessari per al tipus Event
 using Google.Apis.Services;
 using Google.Apis.Util.Store;
 using Microsoft.Extensions.Configuration;
+using Microsoft.SemanticKernel;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -70,29 +73,96 @@ namespace SemanticKernel_Agenda.CALENDAR
 
         public async Task ObtenirUltimsEvents()
         {
+            // 1. Obtenir el Servei de Calendari (amb autenticació)
             var service = await GetCalendarService();
+            // Aquesta línia crida al mètode privat 'GetCalendarService()' que s'encarrega de:
+            //   - Realitzar el procés d'autenticació OAuth2 amb Google (si no s'ha fet abans o el token ha caducat).
+            //   - Utilitzar les credencials (ClientId, ClientSecret) de 'configs.json'.
+            //   - Emmagatzemar o carregar el token d'accés des de 'token.json'.
+            //   - Finalment, retorna una instància inicialitzada de 'CalendarService' que ja està autenticada
+            //     i llesta per fer crides a l'API de Google Calendar.
 
+            // 2. Crear una Sol·licitud per Llistar Esdeveniments
             EventsResource.ListRequest request = service.Events.List("primary");
-            request.TimeMinDateTimeOffset = DateTime.Now;
-            request.ShowDeleted = false;
-            request.SingleEvents = true;
-            request.MaxResults = 10;
-            request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
+            // Es crea un objecte 'ListRequest' que representa la sol·licitud per obtenir una llista d'esdeveniments.
+            // 'service.Events.List' és el mètode per iniciar aquesta sol·licitud.
+            // "primary" indica que volem obtenir esdeveniments del calendari principal de l'usuari (el seu calendari per defecte).
 
+            // 3. Configurar els Paràmetres de la Sol·licitud
+            request.TimeMinDateTimeOffset = DateTime.Now;
+            // Estableix el filtre perquè només es retornin esdeveniments que comencen A PARTIR de la data i hora actual.
+            // 'DateTime.Now' obté la data i hora actual del sistema.
+            // 'TimeMinDateTimeOffset' és la propietat preferida per a la gestió de dates/hores amb zones horàries.
+
+            request.ShowDeleted = false;
+            // Indica a l'API que NO inclogui els esdeveniments que l'usuari hagi marcat com a eliminats.
+
+            request.SingleEvents = true;
+            // Si hi ha esdeveniments recurrents (per exemple, una reunió cada dilluns),
+            // aquesta propietat fa que l'API retorni cada ocurrència de l'esdeveniment recurrent per separat
+            // com a esdeveniments individuals en lloc de l'esdeveniment recurrent mestre.
+
+            request.MaxResults = 10;
+            // Limita el nombre màxim d'esdeveniments que es retornaran en la resposta a 10.
+            // Això evita carregar massa dades innecessàriament.
+
+            request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
+            // Ordena els esdeveniments retornats per la seva data i hora d'inici.
+            // 'StartTime' significa que els esdeveniments més propers en el temps apareixeran primer.
+
+            // 4. Executar la Sol·licitud a l'API de Google Calendar
             var events = await request.ExecuteAsync();
+            // Envia la sol·licitud configurada a l'API de Google Calendar de manera asíncrona.
+            // La resposta, que conté els esdeveniments, s'emmagatzema a la variable 'events'.
+
+            // 5. Processar i Mostrar els Resultats
             Console.WriteLine("Propers esdeveniments:");
             if (events.Items == null || events.Items.Count == 0)
             {
+                // Si no hi ha cap esdeveniment retornat o la llista d'elements és buida.
                 Console.WriteLine("No hi ha esdeveniments.");
             }
             else
             {
+                // Si s'han trobat esdeveniments, es recorre la llista.
                 foreach (var eventItem in events.Items)
                 {
+                    // Per cada esdeveniment:
+                    // S'intenta obtenir la data i hora d'inici amb 'DateTime.HasValue'.
+                    // Si té un valor de data i hora concret, es formatada amb "g" (format general de data i hora).
+                    // Si no (p. ex., és un esdeveniment de tot el dia), s'utilitza només la propietat 'Date'.
                     string when = eventItem.Start.DateTime.HasValue ? eventItem.Start.DateTime.Value.ToString("g") : eventItem.Start.Date;
+                    // S'imprimeix el resum (títol) de l'esdeveniment i la seva data/hora d'inici a la consola.
                     Console.WriteLine($"- {eventItem.Summary} ({when})");
                 }
             }
+        }
+
+        /// <summary>
+        /// Obté una llista dels esdeveniments del calendari principal entre una data d'inici i una data de fi.
+        /// </summary>
+        /// <param name="startDate">La data i hora d'inici del rang (inclusiu).</param>
+        /// <param name="endDate">La data i hora de fi del rang (exclusiu).</param>
+        /// <returns>Una llista d'objectes Event de Google Calendar.</returns>
+        public async Task<IList<Google.Apis.Calendar.v3.Data.Event>> ObtenirEventsEntreDates(DateTimeOffset startDate, DateTimeOffset endDate)
+        {
+            var service = await GetCalendarService();
+
+            EventsResource.ListRequest request = service.Events.List("primary");
+            request.TimeMinDateTimeOffset = startDate; // Estableix la data i hora mínima
+            request.TimeMaxDateTimeOffset = endDate;   // Estableix la data i hora màxima
+            request.ShowDeleted = false;
+            request.SingleEvents = true;
+            request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
+            // No limitem MaxResults aquí per defecte, per obtenir tots els de la franja.
+            // Si la franja pot ser molt gran, potser voldríem afegir paginació o un límit.
+
+            var events = await request.ExecuteAsync();
+
+            // Retornem la llista d'esdeveniments directament.
+            // La impressió a consola es farà des d'on es cridi aquest mètode,
+            // o bé en un mètode wrapper del CalendarPlugin.
+            return events.Items ?? new List<Google.Apis.Calendar.v3.Data.Event>();
         }
 
         /// <summary>
