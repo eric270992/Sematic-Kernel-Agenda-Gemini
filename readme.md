@@ -151,6 +151,7 @@ Aquest fitxer conté les credencials sensibles i configuracions que no s'han de 
     "**/platforms"
   ]
 }
+```
 
 ## Configuració i Execució
 Obtenir Credencials:
