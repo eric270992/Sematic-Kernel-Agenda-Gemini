@@ -209,3 +209,59 @@ Aquest fitxer conté les credencials sensibles i configuracions que no s'han de 
   ```bash
   dotnet add package Microsoft.SemanticKernel --prerelease
   dotnet add package Microsoft.SemanticKernel.Connectors.Google --prerelease
+
+# TELEGRAM BOT
+
+# Integració amb Telegram per a la Gestió de l'Agenda
+
+Aquesta aplicació s'ha millorat per integrar-se amb l'API de Telegram, permetent la gestió d'esdeveniments al calendari directament des d'un xat de Telegram. L'agent intel·ligent, impulsat per Gemini a través de Semantic Kernel, ara pot escoltar missatges de Telegram, processar-los, i respondre de manera interactiva, utilitzant les funcions del calendari quan sigui necessari.
+
+## Com funciona la integració amb Telegram
+
+La integració amb Telegram es gestiona a través del `TelegramPlugin`, que actua com a pont entre l'API de Telegram i el nucli lògic de la nostra aplicació (Semantic Kernel amb Gemini).
+
+1.  **`TelegramPlugin`**:
+    *   Aquesta classe s'inicialitza amb el `Kernel` de Semantic Kernel i la configuració de l'aplicació (`IConfiguration`).
+    *   Obté el token del bot de Telegram del fitxer `configs.json` (vegeu la secció de configuració més avall).
+    *   El mètode `LlegirMissatge()` inicia un bucle que escolta activament els nous missatges entrants al bot de Telegram.
+
+2.  **Processament de Missatges amb `GeminiChatService`**:
+    *   Quan el `TelegramPlugin` rep un missatge de text d'un usuari de Telegram, el passa al mètode `GetTelegramChatResponseAsync()` del `GeminiChatService`.
+    *   El `GeminiChatService` utilitza el model Gemini per processar el missatge. Aquest servei manté un historial de xat dedicat per a les interaccions de Telegram, permetent converses contextualitzades.
+
+3.  **Tool Calling i Gestió de l'Agenda**:
+    *   La configuració `ToolCallBehavior = Microsoft.SemanticKernel.Connectors.Google.GeminiToolCallBehavior.AutoInvokeKernelFunctions` és **crucial**. Aquesta configuració permet a Gemini detectar automàticament quan el missatge de l'usuari implica una acció que pot ser realitzada per una "Kernel Function" (eina) del `CalendarPlugin` (per exemple, crear una cita o consultar-ne).
+    *   Si Gemini detecta una intenció com "crea una cita per demà", invocarà internament la funció `CreateCalendarEvent` del `CalendarPlugin` amb els paràmetres extrets del missatge de l'usuari.
+    *   La resposta de Gemini, ja sigui una afirmació de la creació de la cita, un error, o una simple resposta conversacional, es retorna al `TelegramPlugin`.
+
+4.  **Resposta a l'Usuari de Telegram**:
+    *   Finalment, el `TelegramPlugin` agafa la resposta generada per Gemini i l'envia de tornada a l'usuari al xat de Telegram.
+
+Això crea una experiència interactiva on l'usuari pot gestionar la seva agenda a través de converses en llenguatge natural.
+
+## Configuració del Bot de Telegram
+
+Per habilitar la integració amb Telegram, necessites un bot de Telegram i el seu token.
+
+1.  **Crea un Bot de Telegram**:
+    *   Obre Telegram i cerca el bot anomenat `@BotFather`.
+    *   Inicia una conversa amb `@BotFather` i utilitza la comanda `/newbot`.
+    *   Seguiu les instruccions per donar un nom i un nom d'usuari al vostre bot.
+    *   `@BotFather` et proporcionarà un `HTTP API Token`. Aquest token és una cadena llarga de caràcters (semblant a `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`). **Guarda'l amb seguretat!**
+
+2.  **Actualitza `configs.json`**:
+    *   Afegeix la següent secció al teu fitxer `configs.json` i substitueix `"LaMevaKeyBotTelegram"` pel token que t'ha proporcionat `@BotFather`:
+
+    ```json
+    {
+      // ... altres configuracions ...
+      "Telegram": {
+        "BotToken": "ElTeuTokenDelBotDeTelegramAqui"
+      },
+      // ...
+    }
+    ```
+
+3.  **Executa l'Aplicació**:
+    *   Un cop configurat el token, en iniciar l'aplicació, el `TelegramPlugin` s'inicialitzarà i començarà a escoltar missatges.
+    *   Podràs interaccionar amb el teu bot de Telegram (cercant-lo pel nom d'usuari que li vas donar) i provar les funcionalitats de gestió de l'agenda.
