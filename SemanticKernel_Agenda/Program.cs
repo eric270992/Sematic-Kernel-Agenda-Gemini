@@ -75,6 +75,10 @@ namespace SemanticKernel_Agenda
             // com a "Kernel Functions" perquè Semantic Kernel i Gemini les puguin invocar de manera intel·ligent.
             services.AddSingleton<CalendarPlugin>();
 
+            // Afegim el nostre TelegramPlugin com a singleton.
+            // Aquesta classe gestiona la interacció amb l'API de Telegram per llegir missatges i enviar respostes.
+            services.AddSingleton<PLUGINS.TelegramPlugin>();
+
             // 3. Construir el ServiceProvider
             // El ServiceProvider és l'objecte que resol les dependències i crea instàncies dels serveis registrats
             // quan són sol·licitats.
@@ -83,6 +87,8 @@ namespace SemanticKernel_Agenda
             //Importem plugins al Kernel
             var kernel = serviceProvider.GetRequiredService<Kernel>();
             var calendarPlugin = serviceProvider.GetRequiredService<CalendarPlugin>();
+            var telegramPlugin = serviceProvider.GetRequiredService<PLUGINS.TelegramPlugin>();
+
             kernel.ImportPluginFromObject(calendarPlugin, "CalendarPlugin"); // S'afegeix al Kernel ja construït
 
             // 4. Resol serveis i prepara el Kernel per a la interacció amb l'usuari
@@ -95,7 +101,13 @@ namespace SemanticKernel_Agenda
 
             Console.WriteLine("Plugin de Calendari carregat amb èxit i disponible per a Gemini.");
             // Iniciar el xat interactiu
-            await geminiChatService.StartInteractiveChatAsync();
+            //await geminiChatService.StartInteractiveChatAsync();
+
+            // Iniciar el bot de Telegram per llegir missatges i respondre'ls
+            // Aquesta funció és bloquejant i manté el bot en execució.
+            // També gestiona la lectura de missatges i l'enviament de respostes fent servir el GeminiChatService.
+            // GetTelegramChatResponseAsync té el Tool Calling habilitat per defecte.
+            await telegramPlugin.LlegirMissatge();
 
         }
     }
